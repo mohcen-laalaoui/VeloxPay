@@ -21,6 +21,7 @@ dependencies:
   flutter_launcher_icons: ^0.14.3
   launcher_name: ^1.0.2
   lucide_icons: ^0.257.0
+  firebase_dart: ^1.0.9
 
 dev_dependencies:
   flutter_test:

@@ -49,7 +49,7 @@ class HomePage extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'FinTrack',
+                          'VeloxPay',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -227,9 +227,7 @@ class HomePage extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
-                            builder: (context) =>  SignInPage(),
-                          ),
+                          MaterialPageRoute(builder: (context) => SignInPage()),
                         );
                       },
                       style: ElevatedButton.styleFrom(

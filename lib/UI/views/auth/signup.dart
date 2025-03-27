@@ -7,651 +7,500 @@ class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
   @override
-  State<SignUpPage> createState() => _SignUpPageState();
+  _SignUpPageState createState() => _SignUpPageState();
 }
 
-final TextEditingController _bankAccountController = TextEditingController();
-final TextEditingController _ifscCodeController = TextEditingController();
-final TextEditingController _cardNumberController = TextEditingController();
-final TextEditingController _idNumberController = TextEditingController();
-bool _agreeToTerms = false;
-
-
-final List<String> _stepTitles = [
-  "Personal Information",
-  "Security Setup",
-  "Financial Details",
-  "Compliance & Terms",
-];
-
-final List<String> _stepDescriptions = [
-  "Enter your personal details to get started.",
-  "Set up security questions to protect your account.",
-  "Provide financial information to link your bank account.",
-  "Agree to our terms and conditions before proceeding.",
-];
-
 class _SignUpPageState extends State<SignUpPage> {
-  int _currentStep = 0;
-  bool _useBiometric = false;
-  bool _linkBankAccount = false;
-  bool _uploadHistory = false;
-  bool _agreeTerms = false;
-  bool _agreePrivacy = false;
-  bool _isLoading = false;
-
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-
   final _phoneController = TextEditingController();
-  final _securityQuestion1Controller = TextEditingController();
-  final _securityAnswer1Controller = TextEditingController();
-  final _securityQuestion2Controller = TextEditingController();
-  final _securityAnswer2Controller = TextEditingController();
-
   final _accountNumberController = TextEditingController();
   final _routingNumberController = TextEditingController();
 
-  void displayMessageToUser(String message) {
-    if (!mounted) return;
-    
+  final _nameFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  final _confirmPasswordFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
+  final _accountNumberFocusNode = FocusNode();
+  final _routingNumberFocusNode = FocusNode();
+
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _useBiometric = false;
+  bool _linkBankAccount = false;
+  bool _uploadHistory = false;
+
+  final _emailRegex = RegExp(
+    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+  );
+  final _phoneRegex = RegExp(r'^\+?1?\d{10,14}$');
+
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red[700] : Colors.green[700],
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
-  Future<void> _completeSignUp() async {
-    if (!_formKey.currentState!.validate()) {
-      displayMessageToUser("Please correct the errors in the form");
-      return;
-    }
-    
-    if (_passwordController.text != _confirmPasswordController.text) {
-      displayMessageToUser("Passwords don't match");
-      return;
-    }
-
-    if (!_agreeTerms || !_agreePrivacy) {
-      displayMessageToUser("You must agree to the terms and privacy policy");
-      return;
-    }
+  Future<void> _submitSignUp() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Create user with Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-            email: _emailController.text,
+            email: _emailController.text.trim(),
             password: _passwordController.text,
           );
-      
-      // Create user document in Firestore
-      await _createUserDocument(userCredential);
-      
-      setState(() {
-        _isLoading = false;
-      });
-      
-      // Show success dialog
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Account Created Successfully'),
-            content: const Text(
-              'Your account has been created. Please check your email for verification.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  // Navigate to login page or home page
-                  Navigator.of(context).pop(); // Go back to previous screen
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+
+      Map<String, dynamic> userData = {
+        'fullName': _nameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'phoneNumber': _phoneController.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'useBiometric': _useBiometric,
+        'uploadHistory': _uploadHistory,
+      };
+
+      if (_linkBankAccount) {
+        userData.addAll({
+          'linkBankAccount': true,
+          'accountNumber': _accountNumberController.text.trim(),
+          'routingNumber': _routingNumberController.text.trim(),
+        });
       }
-      
+
+      await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(userCredential.user!.uid)
+          .set({
+            'fullName': _nameController.text.trim(),
+            'email': _emailController.text.trim(),
+            'phoneNumber': _phoneController.text.trim(),
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+      _showSnackBar('Account created successfully!');
     } on FirebaseAuthException catch (e) {
       String errorMessage;
-      
       switch (e.code) {
         case 'weak-password':
-          errorMessage = 'The password provided is too weak.';
+          errorMessage = 'The password is too weak.';
           break;
         case 'email-already-in-use':
-          errorMessage = 'An account already exists for that email.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is not valid.';
+          errorMessage = 'An account already exists with this email.';
           break;
         default:
-          errorMessage = 'An error occurred: ${e.message}';
+          errorMessage = 'Registration failed. Please try again.';
       }
-      
+      _showSnackBar(errorMessage, isError: true);
+    } catch (e) {
+      _showSnackBar('An unexpected error occurred.', isError: true);
+    } finally {
       setState(() {
         _isLoading = false;
       });
-      
-      displayMessageToUser(errorMessage);
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      
-      displayMessageToUser('An unexpected error occurred: $e');
-    }
-  }
-
-  Future<void> _createUserDocument(UserCredential userCredential) async {
-    if (userCredential.user == null) {
-      throw Exception("User creation failed - user is null");
-    }
-
-    try {
-      // Create a map of user data
-      Map<String, dynamic> userData = {
-        'email': userCredential.user!.email,
-        'username': _nameController.text,
-        'phone': _phoneController.text,
-        'security_question_1': _securityQuestion1Controller.text,
-        'security_answer_1': _securityAnswer1Controller.text,
-        'security_question_2': _securityQuestion2Controller.text,
-        'security_answer_2': _securityAnswer2Controller.text,
-        'use_biometric': _useBiometric,
-        'created_at': FieldValue.serverTimestamp(),
-      };
-      
-      // Only add financial details if user has opted in
-      if (_linkBankAccount) {
-        userData['account_number'] = _accountNumberController.text;
-        userData['routing_number'] = _routingNumberController.text;
-      }
-      
-      userData['link_bank_account'] = _linkBankAccount;
-      userData['upload_history'] = _uploadHistory;
-      userData['agree_terms'] = _agreeTerms;
-      userData['agree_privacy'] = _agreePrivacy;
-
-      // Add to Firestore with user UID as document ID (more secure than email)
-      await FirebaseFirestore.instance
-          .collection("Users")
-          .doc(userCredential.user!.uid)
-          .set(userData);
-      
-    } catch (e) {
-      print("Error creating user document: $e");
-      throw Exception("Failed to save user data: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Create Account',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
+        centerTitle: true,
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E3A8A)))
-        : Column(
-          children: [
-            // Progress indicator
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _stepTitles[_currentStep],
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Let\'s get started',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Create an account to access our banking services',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 32),
+
+                        TextFormField(
+                          controller: _nameController,
+                          focusNode: _nameFocusNode,
+                          decoration: _customInputDecoration(
+                            labelText: 'Full Name',
+                            prefixIcon: Icons.person_outline,
+                          ),
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(
+                              context,
+                            ).requestFocus(_emailFocusNode);
+                          },
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your full name';
+                            }
+                            if (value.trim().split(' ').length < 2) {
+                              return 'Please enter your full name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        TextFormField(
+                          controller: _emailController,
+                          focusNode: _emailFocusNode,
+                          decoration: _customInputDecoration(
+                            labelText: 'Email Address',
+                            prefixIcon: Icons.email_outlined,
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(
+                              context,
+                            ).requestFocus(_phoneFocusNode);
+                          },
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!_emailRegex.hasMatch(value.trim())) {
+                              return 'Please enter a valid email address';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        TextFormField(
+                          controller: _phoneController,
+                          focusNode: _phoneFocusNode,
+                          decoration: _customInputDecoration(
+                            labelText: 'Phone Number',
+                            prefixIcon: Icons.phone_outlined,
+                          ),
+                          keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(
+                              context,
+                            ).requestFocus(_passwordFocusNode);
+                          },
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your phone number';
+                            }
+                            if (!_phoneRegex.hasMatch(value.trim())) {
+                              return 'Please enter a valid phone number';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        TextFormField(
+                          controller: _passwordController,
+                          focusNode: _passwordFocusNode,
+                          decoration: _customInputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: Icons.lock_outline,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(
+                              context,
+                            ).requestFocus(_confirmPasswordFocusNode);
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a password';
+                            }
+                            if (value.length < 8) {
+                              return 'Password must be at least 8 characters long';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          focusNode: _confirmPasswordFocusNode,
+                          decoration: _customInputDecoration(
+                            labelText: 'Confirm Password',
+                            prefixIcon: Icons.lock_outline,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureConfirmPassword =
+                                      !_obscureConfirmPassword;
+                                });
+                              },
+                            ),
+                          ),
+                          obscureText: _obscureConfirmPassword,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _submitSignUp(),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please confirm your password';
+                            }
+                            if (value != _passwordController.text) {
+                              return 'Passwords do not match';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        SwitchListTile(
+                          title: const Text('Enable Biometric Authentication'),
+                          subtitle: const Text(
+                            'Use fingerprint or face recognition',
+                          ),
+                          value: _useBiometric,
+                          onChanged: (bool value) {
+                            setState(() {
+                              _useBiometric = value;
+                            });
+                          },
+                          activeColor: Colors.blue[800],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        SwitchListTile(
+                          title: const Text('Link Bank Account'),
+                          subtitle: const Text(
+                            'Securely connect your bank account',
+                          ),
+                          value: _linkBankAccount,
+                          onChanged: (bool value) {
+                            setState(() {
+                              _linkBankAccount = value;
+                            });
+                          },
+                          activeColor: Colors.blue[800],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        if (_linkBankAccount) ...[
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _accountNumberController,
+                            focusNode: _accountNumberFocusNode,
+                            decoration: _customInputDecoration(
+                              labelText: 'Account Number',
+                              prefixIcon: Icons.account_balance,
+                            ),
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.next,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            onFieldSubmitted: (_) {
+                              FocusScope.of(
+                                context,
+                              ).requestFocus(_routingNumberFocusNode);
+                            },
+                            validator: (value) {
+                              if (_linkBankAccount &&
+                                  (value == null || value.trim().isEmpty)) {
+                                return 'Please enter your account number';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _routingNumberController,
+                            focusNode: _routingNumberFocusNode,
+                            decoration: _customInputDecoration(
+                              labelText: 'Routing Number',
+                              prefixIcon: Icons.numbers,
+                            ),
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.done,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (value) {
+                              if (_linkBankAccount &&
+                                  (value == null || value.trim().isEmpty)) {
+                                return 'Please enter your routing number';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                        const SizedBox(height: 32),
+
+                        ElevatedButton(
+                          onPressed: _submitSignUp,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[800],
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            'Create Account',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+
+                        RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey[600]),
+                            children: [
+                              const TextSpan(
+                                text:
+                                    'By creating an account, you agree to our ',
+                              ),
+                              TextSpan(
+                                text: 'Terms of Service',
+                                style: TextStyle(
+                                  color: Colors.blue[800],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const TextSpan(text: ' and '),
+                              TextSpan(
+                                text: 'Privacy Policy',
+                                style: TextStyle(
+                                  color: Colors.blue[800],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _stepDescriptions[_currentStep],
-                    style: const TextStyle(fontSize: 16, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 16),
-                  // Progress bar
-                  LinearProgressIndicator(
-                    value: (_currentStep + 1) / _stepTitles.length,
-                    backgroundColor: Colors.grey[200],
-                    color: const Color(0xFF1E3A8A),
-                  ),
-                  const SizedBox(height: 8),
-                  // Step counter
-                  Text(
-                    'Step ${_currentStep + 1} of ${_stepTitles.length}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-
-            // Form content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Form(key: _formKey, child: _buildCurrentStepContent()),
-              ),
-            ),
-
-            // Bottom navigation buttons
-            _buildBottomNavigation(),
-          ],
-        ),
-    );
-  }
-
- Widget _buildCurrentStepContent() {
-    switch (_currentStep) {
-      case 0:
-        return _buildPersonalInfoStep();
-      case 1:
-        return _buildSecurityStep();
-      case 2:
-        return _buildFinancialInfoStep(); 
-      case 3:
-        return _buildComplianceStep();
-      default:
-        return Container();
-    }
-  }
-
-
-  Widget _buildPersonalInfoStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _nameController,
-          decoration: InputDecoration(
-            labelText: 'Full Name',
-            prefixIcon: const Icon(Icons.person_outline),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your name';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _emailController,
-          decoration: InputDecoration(
-            labelText: 'Email',
-            prefixIcon: const Icon(Icons.email_outlined),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          keyboardType: TextInputType.emailAddress,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your email';
-            } else if (!RegExp(
-              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-            ).hasMatch(value)) {
-              return 'Please enter a valid email';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _passwordController,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: 'Password',
-            prefixIcon: const Icon(Icons.lock_outline),
-            suffixIcon: const Icon(Icons.visibility_outlined),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            helperText:
-                'Password must contain at least 8 characters, including uppercase, lowercase, and numbers',
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter a password';
-            } else if (value.length < 8) {
-              return 'Password must be at least 8 characters long';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _confirmPasswordController,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: 'Confirm Password',
-            prefixIcon: const Icon(Icons.lock_outline),
-            suffixIcon: const Icon(Icons.visibility_outlined),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please confirm your password';
-            } else if (value != _passwordController.text) {
-              return 'Passwords do not match';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSecurityStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFBFDBFE)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.security, color: Color(0xFF3B82F6)),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Two-factor authentication adds an extra layer of security to your account',
-                  style: TextStyle(color: Color(0xFF1E40AF)),
                 ),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          '2FA (Two-Factor Authentication)',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _phoneController,
-          decoration: InputDecoration(
-            labelText: 'Phone Number for SMS Verification',
-            prefixIcon: const Icon(Icons.phone),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          keyboardType: TextInputType.phone,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your phone number';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Security Questions',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Set up security questions for account recovery',
-          style: TextStyle(fontSize: 14, color: Colors.black54),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _securityQuestion1Controller,
-          decoration: InputDecoration(
-            labelText: 'Security Question 1',
-            prefixIcon: const Icon(Icons.question_answer_outlined),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            hintText: 'e.g. What was your first pet\'s name?',
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter a security question';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _securityAnswer1Controller,
-          decoration: InputDecoration(
-            labelText: 'Answer to Question 1',
-            prefixIcon: const Icon(Icons.lock_outline),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter an answer';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _securityQuestion2Controller,
-          decoration: InputDecoration(
-            labelText: 'Security Question 2',
-            prefixIcon: const Icon(Icons.question_answer_outlined),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            hintText: 'e.g. In what city were you born?',
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter a security question';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _securityAnswer2Controller,
-          decoration: InputDecoration(
-            labelText: 'Answer to Question 2',
-            prefixIcon: const Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter an answer';
-            }
-            return null;
-          },
-        ),
-      ],
     );
   }
 
-  Widget _buildBottomNavigation() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          if (_currentStep > 0)
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _currentStep--;
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[300],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: Text('Back', style: TextStyle(color: Colors.black87)),
-              ),
-            ),
-          ElevatedButton(
-            onPressed: () {
-              if (_formKey.currentState!.validate()) {
-                setState(() {
-                  if (_currentStep < _stepTitles.length - 1) {
-                    _currentStep++;
-                  } else {
-                    _submitForm();
-                  }
-                });
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E3A8A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Text(
-                _currentStep < _stepTitles.length - 1 ? 'Next' : 'Submit',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-        ],
+  InputDecoration _customInputDecoration({
+    required String labelText,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: labelText,
+      prefixIcon: Icon(prefixIcon, color: Colors.grey),
+      suffixIcon: suffixIcon,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[300]!),
       ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.blue[800]!),
+      ),
+      filled: true,
+      fillColor: Colors.grey[100],
+      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
     );
   }
 
-Widget _buildFinancialInfoStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _bankAccountController,
-          decoration: InputDecoration(
-            labelText: 'Bank Account Number',
-            prefixIcon: const Icon(Icons.account_balance),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          keyboardType: TextInputType.number,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your bank account number';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _ifscCodeController,
-          decoration: InputDecoration(
-            labelText: 'Bank IFSC Code',
-            prefixIcon: const Icon(Icons.code),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter the IFSC code';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _cardNumberController,
-          decoration: InputDecoration(
-            labelText: 'Card Number',
-            prefixIcon: const Icon(Icons.credit_card),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          keyboardType: TextInputType.number,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your card number';
-            } else if (value.length < 16) {
-              return 'Card number must be 16 digits';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _phoneController.dispose();
 
-Widget _buildComplianceStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Identity Verification',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _idNumberController,
-          decoration: InputDecoration(
-            labelText: 'National ID / Passport Number',
-            prefixIcon: const Icon(Icons.perm_identity),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your ID or passport number';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        CheckboxListTile(
-          value: _agreeToTerms,
-          onChanged: (value) {
-            setState(() {
-              _agreeToTerms = value!;
-            });
-          },
-          title: const Text(
-            'I agree to the terms and conditions',
-            style: TextStyle(fontSize: 14),
-          ),
-          controlAffinity: ListTileControlAffinity.leading,
-        ),
-      ],
-    );
-  }
+    _nameFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
+    _phoneFocusNode.dispose();
 
-
-  void _submitForm() {
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Simulate form submission process
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account created successfully!')),
-      );
-
-      Navigator.pop(context);
-    });
+    super.dispose();
   }
 }

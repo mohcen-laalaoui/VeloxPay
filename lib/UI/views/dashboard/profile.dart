@@ -66,7 +66,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-Widget _buildUserHeader() {
+  Widget _buildUserHeader() {
     final User? user = FirebaseAuth.instance.currentUser;
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -83,16 +83,13 @@ Widget _buildUserHeader() {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user?.email ?? 'User Email', 
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold, 
-                    fontSize: 16
-                  ),
+                  user?.email ?? 'User Email',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'UID: ${user?.uid ?? 'N/A'}', 
+                  'UID: ${user?.uid ?? 'N/A'}',
                   style: TextStyle(color: Colors.grey),
                 ),
               ],
@@ -141,7 +138,7 @@ Widget _buildUserHeader() {
       contentPadding: EdgeInsets.symmetric(horizontal: 16),
       leading: Icon(Icons.logout, color: Colors.red),
       title: Text(
-        'Logout', 
+        'Logout',
         style: TextStyle(color: Colors.red),
         overflow: TextOverflow.ellipsis,
       ),
@@ -176,7 +173,7 @@ Widget _buildUserHeader() {
     try {
       // Sign out from Firebase Authentication
       await FirebaseAuth.instance.signOut();
-      
+
       // Navigate to login page and remove all previous routes
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
@@ -198,10 +195,7 @@ Widget _buildUserHeader() {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Text(
         title,
-        style: TextStyle(
-          color: Colors.grey, 
-          fontWeight: FontWeight.bold
-        ),
+        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -221,56 +215,57 @@ Widget _buildUserHeader() {
     );
   }
 }
-  Widget _buildLogoutItem(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: 16),
-      leading: Icon(Icons.logout, color: Colors.red),
-      title: Text(
-        'Logout',
-        style: TextStyle(color: Colors.red),
-        overflow: TextOverflow.ellipsis,
-      ),
-      onTap: () => _showLogoutConfirmationDialog(context),
-    );
-  }
 
-  void _showLogoutConfirmationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Logout'),
-          content: Text('Are you sure you want to logout?'),
-          actions: [
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () => _performLogout(context),
-              child: Text('Logout'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+Widget _buildLogoutItem(BuildContext context) {
+  return ListTile(
+    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+    leading: Icon(Icons.logout, color: Colors.red),
+    title: Text(
+      'Logout',
+      style: TextStyle(color: Colors.red),
+      overflow: TextOverflow.ellipsis,
+    ),
+    onTap: () => _showLogoutConfirmationDialog(context),
+  );
+}
 
-  void _performLogout(BuildContext context) async {
-    try {
-      await FirebaseAuth.instance.signOut();
-
-      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-    } catch (e) {
-      // Close the confirmation dialog
-      Navigator.of(context).pop();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Logout failed: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+void _showLogoutConfirmationDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Logout'),
+        content: Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => _performLogout(context),
+            child: Text('Logout'),
+          ),
+        ],
       );
-    }
+    },
+  );
+}
+
+void _performLogout(BuildContext context) async {
+  try {
+    await FirebaseAuth.instance.signOut();
+
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  } catch (e) {
+    // Close the confirmation dialog
+    Navigator.of(context).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Logout failed: ${e.toString()}'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}

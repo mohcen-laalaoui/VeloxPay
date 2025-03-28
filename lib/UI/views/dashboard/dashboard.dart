@@ -4,6 +4,8 @@ import 'package:financial/UI/views/dashboard/benefits.dart';
 import 'package:financial/UI/views/dashboard/card.dart';
 import 'package:financial/UI/views/dashboard/hub.dart';
 import 'package:financial/UI/views/dashboard/profile.dart';
+import 'package:financial/UI/views/dashboard/notifications.dart ';
+import 'package:financial/UI/views/dashboard/deposit.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -37,7 +39,7 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         title: Text(
           _titles[_selectedIndex],
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -55,11 +57,15 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           IconButton(
             icon: Icon(Icons.notifications_none, color: Colors.black),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => NotificationsPage()),
+              );
+            },
           ),
         ],
       ),
-
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
@@ -104,12 +110,22 @@ class DashboardPageContent extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _actionButton(Icons.add, 'Deposit'),
+              _actionButton(
+                Icons.add,
+                'Deposit',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => DepositPage()),
+                  );
+                },
+              ),
               _actionButton(Icons.send, 'Send'),
               _actionButton(Icons.swap_horiz, 'Convert'),
               _actionButton(Icons.more_horiz, 'More'),
             ],
           ),
+
           SizedBox(height: 20),
           _cashbackPromotion(),
           SizedBox(height: 20),
@@ -124,20 +140,23 @@ class DashboardPageContent extends StatelessWidget {
     );
   }
 
-  Widget _actionButton(IconData icon, String label) {
-    return Column(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            shape: BoxShape.circle,
+  Widget _actionButton(IconData icon, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              shape: BoxShape.circle,
+            ),
+            padding: EdgeInsets.all(12),
+            child: Icon(icon, color: Colors.black),
           ),
-          padding: EdgeInsets.all(12),
-          child: Icon(icon, color: Colors.black),
-        ),
-        SizedBox(height: 8),
-        Text(label),
-      ],
+          SizedBox(height: 8),
+          Text(label),
+        ],
+      ),
     );
   }
 

@@ -44,10 +44,10 @@ class _SignInPageState extends State<SignInPage> {
           () =>
               FocusScope.of(
                 context,
-              ).unfocus(), // Dismiss keyboard when tapping outside
+              ).unfocus(), 
       child: Scaffold(
         resizeToAvoidBottomInset:
-            true, // Allow the scaffold to resize when keyboard appears
+            true, 
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -62,9 +62,7 @@ class _SignInPageState extends State<SignInPage> {
           ),
         ),
         body: SafeArea(
-          // Use SafeArea to prevent overflow
           child: SingleChildScrollView(
-            // Wrap with SingleChildScrollView
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(

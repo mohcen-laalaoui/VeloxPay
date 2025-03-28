@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:financial/UI/views/auth/signup.dart';
 import 'package:financial/UI/views/auth/signin.dart';
+import 'package:financial/UI/views/home/OnboardingScreen.dart';
 
 class FinancialApp extends StatelessWidget {
   const FinancialApp({super.key});
@@ -44,7 +45,6 @@ class HomePage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // App Bar
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -78,7 +78,6 @@ class HomePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 30),
 
-                    // Hero section
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
@@ -114,7 +113,12 @@ class HomePage extends StatelessWidget {
                             children: [
                               OutlinedButton(
                                 onPressed: () {
-                                  // Navigate to get started page
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => OnboardingScreen(),
+                                    ),
+                                  );
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.white,
@@ -129,16 +133,26 @@ class HomePage extends StatelessWidget {
                                 ),
                                 child: const Text('Get Started'),
                               ),
-                              Container(
-                                height: 50,
-                                width: 50,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white24,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.arrow_forward,
-                                  color: Colors.white,
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => OnboardingScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  height: 50,
+                                  width: 50,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white24,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_forward,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ],
@@ -148,7 +162,6 @@ class HomePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
 
-                    // Features section
                     const Text(
                       'Features',
                       style: TextStyle(
@@ -159,7 +172,6 @@ class HomePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // Feature tiles
                     Expanded(
                       child: GridView.count(
                         crossAxisCount: 2,
@@ -200,82 +212,6 @@ class HomePage extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-            ),
-
-            // Bottom auth buttons
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => SignInPage()),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E3A8A),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign In',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SignUpPage(),
-                          ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF1E3A8A),
-                        side: const BorderSide(color: Color(0xFF1E3A8A)),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

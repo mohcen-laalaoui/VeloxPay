@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:financial/UI/views/auth/signin.dart';
-import 'package:financial/UI/views/auth/signup.dart';
 import 'package:financial/UI/views/dashboard/profile.dart';
 import 'package:financial/UI/views/home/home.dart';
 

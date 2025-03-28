@@ -6,6 +6,8 @@ import 'package:financial/UI/views/dashboard/hub.dart';
 import 'package:financial/UI/views/dashboard/profile.dart';
 import 'package:financial/UI/views/dashboard/notifications.dart ';
 import 'package:financial/UI/views/dashboard/deposit.dart';
+import 'package:financial/UI/views/dashboard/send.dart';
+import 'package:financial/UI/views/dashboard/convert.dart ';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -16,7 +18,6 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
-
   final List<Widget> _pages = [
     DashboardPageContent(),
     CardPage(),
@@ -87,7 +88,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class DashboardPageContent extends StatelessWidget {
+class DashboardPageContent extends StatefulWidget {
+  const DashboardPageContent({super.key});
+
+  @override
+  State<DashboardPageContent> createState() => _DashboardPageContentState();
+}
+
+class _DashboardPageContentState extends State<DashboardPageContent> {
+  bool _isVisible = true;
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -99,12 +109,21 @@ class DashboardPageContent extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Total Value (USD)', style: TextStyle(color: Colors.grey)),
-              IconButton(icon: Icon(Icons.visibility_off), onPressed: () {}),
+              IconButton(
+                icon: Icon(
+                  _isVisible ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isVisible = !_isVisible;
+                  });
+                },
+              ),
             ],
           ),
           Text(
-            '\$1.91',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            _isVisible ? '\$1.91' : '***',
+            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 20),
           Row(
@@ -120,8 +139,26 @@ class DashboardPageContent extends StatelessWidget {
                   );
                 },
               ),
-              _actionButton(Icons.send, 'Send'),
-              _actionButton(Icons.swap_horiz, 'Convert'),
+              _actionButton(
+                Icons.send,
+                'Send',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => SendPage()),
+                  );
+                },
+              ),
+              _actionButton(
+                Icons.swap_horiz,
+                'Convert',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ConvertPage()),
+                  );
+                },
+              ),
               _actionButton(Icons.more_horiz, 'More'),
             ],
           ),

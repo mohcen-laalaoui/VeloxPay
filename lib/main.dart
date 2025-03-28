@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:financial/UI/views/home/home.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:financial/firebase_options.dart';
+import 'package:financial/UI/views/auth/signin.dart';
+import 'package:financial/UI/views/dashboard/profile.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,6 +16,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(debugShowCheckedModeBanner: false, home: HomePage());
+    return MaterialApp(
+      routes: {
+        '/': (context) => HomePage(),
+        '/login': (context) => SignInPage(),
+        '/home': (context) => HomePage(),
+        '/profile': (context) => ProfilePage(),
+      },
+      initialRoute: '/home',
+      title: 'VeloxPay',
+      debugShowCheckedModeBanner: false,
+    );
   }
 }

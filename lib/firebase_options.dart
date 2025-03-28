@@ -50,8 +50,8 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'apiKey',
-    appId: 'ID',
+    apiKey: 'AIzaSyDk75XOZBNmRHQUcCYh_QRLwLhY3cQclnk',
+    appId: '1:135042312110:android:caf57725d4ca81af140a3f',
     messagingSenderId: '135042312110',
     projectId: 'financialapp-cdb08',
     storageBucket: 'financialapp-cdb08.firebasestorage.app',

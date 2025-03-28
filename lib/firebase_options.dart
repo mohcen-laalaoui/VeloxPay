@@ -58,8 +58,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBUGPKajm6OLvon6yeApZAeNl7OP2UwDTQ',
-    appId: '1:135042312110:ios:02d9a0ad26b3a9a0140a3f',
+    apiKey: 'Key',
+    appId: 'ID',
     messagingSenderId: '135042312110',
     projectId: 'financialapp-cdb08',
     storageBucket: 'financialapp-cdb08.firebasestorage.app',

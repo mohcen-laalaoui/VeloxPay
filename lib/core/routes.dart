@@ -2,9 +2,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'package:financial/UI/views/auth/signin.dart';
-import 'package:financial/UI/views/dashboard/profile.dart';
-import 'package:financial/UI/views/home/home.dart';
+import 'package:VeloxPay/UI/views/auth/signin.dart';
+import 'package:VeloxPay/UI/views/dashboard/profile.dart';
+import 'package:VeloxPay/UI/views/home/home.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:financial/UI/views/auth/signup.dart';
-import 'package:financial/UI/views/dashboard/dashboard.dart';
+import 'package:VeloxPay/UI/views/auth/signup.dart';
+import 'package:VeloxPay/UI/views/dashboard/dashboard.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -15,6 +15,7 @@ class _SignInPageState extends State<SignInPage> {
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = false;
+  String? _errorMessage;
 
   Future<void> signIn() async {
     setState(() => _isLoading = true);
@@ -28,26 +29,36 @@ class _SignInPageState extends State<SignInPage> {
         context,
         MaterialPageRoute(builder: (context) => DashboardPage()),
       );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Login Failed: ${e.toString()}")));
-    }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = "Login failed. Please try again.";
+      if (e.code == 'user-not-found') {
+        errorMessage = "No account found for this email.";
+      } else if (e.code == 'wrong-password') {
+        errorMessage = "Incorrect password. Please try again.";
+      } else if (e.code == 'invalid-email') {
+        errorMessage = "Invalid email format.";
+      }
 
-    setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap:
-          () =>
-              FocusScope.of(
-                context,
-              ).unfocus(), 
+      onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        resizeToAvoidBottomInset:
-            true, 
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -112,13 +123,23 @@ class _SignInPageState extends State<SignInPage> {
                       child: const Text('Forgot Password?'),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 10),
+
+                  if (_errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red, fontSize: 14),
+                      ),
+                    ),
+
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : signIn,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E3A8A),
+                        backgroundColor: const Color(0xFF2E5BFF),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(

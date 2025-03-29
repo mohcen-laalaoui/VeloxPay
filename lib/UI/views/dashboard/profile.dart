@@ -83,7 +83,7 @@ class ProfilePage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user?.email ?? 'User Email',
+                  user?.displayName ?? 'Full Name',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -171,16 +171,12 @@ class ProfilePage extends StatelessWidget {
 
   void _performLogout(BuildContext context) async {
     try {
-      // Sign out from Firebase Authentication
       await FirebaseAuth.instance.signOut();
 
-      // Navigate to login page and remove all previous routes
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
-      // Close the confirmation dialog
       Navigator.of(context).pop();
 
-      // Show error if logout fails
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Logout failed: ${e.toString()}'),
@@ -258,7 +254,6 @@ void _performLogout(BuildContext context) async {
 
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   } catch (e) {
-    // Close the confirmation dialog
     Navigator.of(context).pop();
 
     ScaffoldMessenger.of(context).showSnackBar(

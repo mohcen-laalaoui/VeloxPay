@@ -1,6 +1,6 @@
 // ignore: file_names
-import 'package:financial/UI/views/auth/signin.dart';
-import 'package:financial/UI/views/auth/signup.dart';
+import 'package:VeloxPay/UI/views/auth/signin.dart';
+import 'package:VeloxPay/UI/views/auth/signup.dart';
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
@@ -85,7 +85,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                         minimumSize: const Size(120, 40),
                       ),
-                      child: const Text('GET STARTED' , style: TextStyle(color: Colors.white),),
+                      child: const Text(
+                        'GET STARTED',
+                        style: TextStyle(color: Colors.white),
+                      ),
                       onPressed:
                           () => Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
@@ -130,7 +133,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                      child: const Text('NEXT' , style: TextStyle(color: Colors.white),),
+                      child: const Text(
+                        'NEXT',
+                        style: TextStyle(color: Colors.white),
+                      ),
                       onPressed:
                           () => controller.nextPage(
                             duration: const Duration(milliseconds: 500),
@@ -160,7 +166,7 @@ class OnboardingPage extends StatelessWidget {
     this.imageSize = 150.0,
   });
   @override
-   Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
     return Container(
       color: color,
       child: Column(
@@ -175,7 +181,10 @@ class OnboardingPage extends StatelessWidget {
           const SizedBox(height: 20),
           Text(
             title,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold ,  color: Color(0xFF2E5BFF),
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2E5BFF),
             ),
           ),
           const SizedBox(height: 10),

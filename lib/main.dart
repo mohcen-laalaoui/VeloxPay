@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:financial/core/theme/dark_mod.dart';
-import 'package:financial/core/theme/light_mod.dart';
-import 'package:financial/UI/views/home/home.dart';
+import 'package:VeloxPay/UI/views/home/home.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:financial/firebase_options.dart';
-import 'package:financial/UI/views/auth/signin.dart';
-import 'package:financial/UI/views/dashboard/profile.dart';
+import 'package:VeloxPay/firebase_options.dart';
+import 'package:VeloxPay/UI/views/auth/signin.dart';
+import 'package:VeloxPay/UI/views/dashboard/profile.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:financial/UI/views/auth/signup.dart';
-import 'package:financial/UI/views/auth/signin.dart';
-import 'package:financial/UI/views/home/OnboardingScreen.dart';
+import 'package:VeloxPay/UI/views/home/OnboardingScreen.dart';
 
 class FinancialApp extends StatelessWidget {
   const FinancialApp({super.key});
@@ -10,7 +8,7 @@ class FinancialApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'FinTrack',
+      title: 'VeloxPay',
       theme: ThemeData(
         primaryColor: const Color(0xFF1E3A8A),
         colorScheme: ColorScheme.fromSeed(

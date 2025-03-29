@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:financial/UI/views/dashboard/benefits.dart';
-import 'package:financial/UI/views/dashboard/card.dart';
-import 'package:financial/UI/views/dashboard/hub.dart';
-import 'package:financial/UI/views/dashboard/profile.dart';
-import 'package:financial/UI/views/dashboard/notifications.dart ';
-import 'package:financial/UI/views/dashboard/deposit.dart';
-import 'package:financial/UI/views/dashboard/send.dart';
-import 'package:financial/UI/views/dashboard/convert.dart ';
+import 'package:VeloxPay/UI/views/dashboard/benefits.dart';
+import 'package:VeloxPay/UI/views/dashboard/card.dart';
+import 'package:VeloxPay/UI/views/dashboard/hub.dart';
+import 'package:VeloxPay/UI/views/dashboard/profile.dart';
+import 'package:VeloxPay/UI/views/dashboard/notifications.dart ';
+import 'package:VeloxPay/UI/views/dashboard/deposit.dart';
+import 'package:VeloxPay/UI/views/dashboard/send.dart';
+import 'package:VeloxPay/UI/views/dashboard/convert.dart ';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});

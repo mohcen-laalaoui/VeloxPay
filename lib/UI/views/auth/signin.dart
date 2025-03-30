@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:VeloxPay/UI/views/auth/signup.dart';
 import 'package:VeloxPay/UI/views/dashboard/dashboard.dart';
+import 'package:VeloxPay/viewmodels/signin_viewmodel.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -13,48 +14,11 @@ class SignInPage extends StatefulWidget {
 class _SignInPageState extends State<SignInPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  bool _isLoading = false;
-  String? _errorMessage;
-
-  Future<void> signIn() async {
-    setState(() => _isLoading = true);
-
-    try {
-      await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => DashboardPage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = "Login failed. Please try again.";
-      if (e.code == 'user-not-found') {
-        errorMessage = "No account found for this email.";
-      } else if (e.code == 'wrong-password') {
-        errorMessage = "Incorrect password. Please try again.";
-      } else if (e.code == 'invalid-email') {
-        errorMessage = "Invalid email format.";
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-
 
   @override
   Widget build(BuildContext context) {
+    final authViewModel = Provider.of<AuthViewModel>(context);
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -125,11 +89,11 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                   const SizedBox(height: 10),
 
-                  if (_errorMessage != null)
+                  if (authViewModel.errorMessage != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Text(
-                        _errorMessage!,
+                        authViewModel.errorMessage!,
                         style: const TextStyle(color: Colors.red, fontSize: 14),
                       ),
                     ),
@@ -137,7 +101,24 @@ class _SignInPageState extends State<SignInPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : signIn,
+                      onPressed:
+                          authViewModel.isLoading
+                              ? null
+                              : () async {
+                                bool success = await authViewModel.signIn(
+                                  _emailController.text.trim(),
+                                  _passwordController.text.trim(),
+                                );
+                                if (success) {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => const DashboardPage(),
+                                    ),
+                                  );
+                                }
+                              },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2E5BFF),
                         foregroundColor: Colors.white,
@@ -147,7 +128,7 @@ class _SignInPageState extends State<SignInPage> {
                         ),
                       ),
                       child:
-                          _isLoading
+                          authViewModel.isLoading
                               ? const CircularProgressIndicator(
                                 color: Colors.white,
                               )
@@ -204,7 +185,7 @@ class _SignInPageState extends State<SignInPage> {
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => SignUpPage(),
+                              builder: (context) => const SignUpPage(),
                             ),
                           );
                         },

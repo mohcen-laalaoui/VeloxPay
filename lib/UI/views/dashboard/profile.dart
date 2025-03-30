@@ -1,8 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  _ProfilePageState createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  String fullName = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFullName();
+  }
+
+  Future<void> _fetchFullName() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      setState(() {
+        fullName = user.displayName!;
+      });
+    } else {
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance
+              .collection('Users')
+              .doc(user.uid)
+              .get();
+
+      if (userDoc.exists && userDoc.data() != null) {
+        setState(() {
+          fullName = userDoc['fullName'] ?? 'Unknown User';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +58,6 @@ class ProfilePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildUserHeader(),
-
               _buildReferralSection(),
 
               _buildSectionHeader('Security Settings'),
@@ -57,8 +93,9 @@ class ProfilePage extends StatelessWidget {
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
+
               _buildSectionHeader('Account'),
-              _buildLogoutItem(context),
+              _buildLogoutItem(),
             ],
           ),
         ),
@@ -83,7 +120,7 @@ class ProfilePage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user?.displayName ?? 'Full Name',
+                  fullName,
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -133,7 +170,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoutItem(BuildContext context) {
+  Widget _buildLogoutItem() {
     return ListTile(
       contentPadding: EdgeInsets.symmetric(horizontal: 16),
       leading: Icon(Icons.logout, color: Colors.red),
@@ -142,11 +179,11 @@ class ProfilePage extends StatelessWidget {
         style: TextStyle(color: Colors.red),
         overflow: TextOverflow.ellipsis,
       ),
-      onTap: () => _showLogoutConfirmationDialog(context),
+      onTap: () => _showLogoutConfirmationDialog(),
     );
   }
 
-  void _showLogoutConfirmationDialog(BuildContext context) {
+  void _showLogoutConfirmationDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -160,7 +197,7 @@ class ProfilePage extends StatelessWidget {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () => _performLogout(context),
+              onPressed: _performLogout,
               child: Text('Logout'),
             ),
           ],
@@ -169,14 +206,12 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  void _performLogout(BuildContext context) async {
+  void _performLogout() async {
     try {
       await FirebaseAuth.instance.signOut();
-
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
       Navigator.of(context).pop();
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Logout failed: ${e.toString()}'),
@@ -208,59 +243,6 @@ class ProfilePage extends StatelessWidget {
       title: Text(title, overflow: TextOverflow.ellipsis),
       trailing: trailing ?? Icon(Icons.chevron_right, color: Colors.grey),
       subtitle: bottomTrailing,
-    );
-  }
-}
-
-Widget _buildLogoutItem(BuildContext context) {
-  return ListTile(
-    contentPadding: EdgeInsets.symmetric(horizontal: 16),
-    leading: Icon(Icons.logout, color: Colors.red),
-    title: Text(
-      'Logout',
-      style: TextStyle(color: Colors.red),
-      overflow: TextOverflow.ellipsis,
-    ),
-    onTap: () => _showLogoutConfirmationDialog(context),
-  );
-}
-
-void _showLogoutConfirmationDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text('Logout'),
-        content: Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            child: Text('Cancel'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => _performLogout(context),
-            child: Text('Logout'),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-void _performLogout(BuildContext context) async {
-  try {
-    await FirebaseAuth.instance.signOut();
-
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-  } catch (e) {
-    Navigator.of(context).pop();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Logout failed: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
     );
   }
 }

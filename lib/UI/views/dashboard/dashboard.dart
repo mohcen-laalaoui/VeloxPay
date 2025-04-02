@@ -5,7 +5,7 @@ import 'package:VeloxPay/UI/views/dashboard/card.dart';
 import 'package:VeloxPay/UI/views/dashboard/hub.dart';
 import 'package:VeloxPay/UI/views/dashboard/profile.dart';
 import 'package:VeloxPay/UI/views/dashboard/notifications.dart ';
-import 'package:VeloxPay/UI/views/dashboard/deposit.dart';
+import 'package:VeloxPay/UI/views/dashboard/receive.dart';
 import 'package:VeloxPay/UI/views/dashboard/send.dart';
 import 'package:VeloxPay/UI/views/dashboard/convert.dart ';
 
@@ -135,7 +135,7 @@ class _DashboardPageContentState extends State<DashboardPageContent> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => DepositPage()),
+                    MaterialPageRoute(builder: (context) => ReceivePage()),
                   );
                 },
               ),

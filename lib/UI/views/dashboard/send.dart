@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SendPage extends StatefulWidget {
   const SendPage({super.key});
@@ -15,6 +18,7 @@ class _SendPageState extends State<SendPage> {
   String _selectedRecipientType = 'Phone';
   String _selectedPaymentMethod = 'Bank Transfer';
   int _step = 1;
+  bool _isProcessing = false;
 
   final List<String> _recipientTypes = ['Phone', 'Email', 'ID'];
   final List<String> _paymentMethods = [
@@ -22,6 +26,45 @@ class _SendPageState extends State<SendPage> {
     'Mobile Wallet',
     'Card Payment',
   ];
+
+  late String _currentUserId;
+  double _userBalance = 10.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentUser();
+    _loadUserBalance();
+  }
+
+  Future<void> _getCurrentUser() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      setState(() {
+        _currentUserId = user.uid;
+      });
+    }
+  }
+
+  Future<void> _loadUserBalance() async {
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final DocumentSnapshot userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+
+        setState(() {
+          _userBalance =
+              (userDoc.data() as Map<String, dynamic>)['balance'] ?? 10.0;
+        });
+      }
+    } catch (e) {
+      print('Error loading user balance: $e');
+    }
+  }
 
   void _nextStep() {
     if (_formKey.currentState!.validate()) {
@@ -35,6 +78,202 @@ class _SendPageState extends State<SendPage> {
     setState(() {
       _step--;
     });
+  }
+
+  Future<bool> _validateTransaction() async {
+    double amount = double.parse(_amountController.text);
+
+    if (amount > _userBalance) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Insufficient balance for this transaction'),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+      return false;
+    }
+
+    bool recipientExists = await _checkRecipientExists(
+      _selectedRecipientType,
+      _recipientController.text,
+    );
+
+    if (!recipientExists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Recipient not found with this $_selectedRecipientType',
+          ),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<bool> _checkRecipientExists(String type, String value) async {
+    try {
+      String fieldName = type.toLowerCase();
+
+      QuerySnapshot query =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where(fieldName, isEqualTo: value)
+              .get();
+
+      return query.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking recipient: $e');
+      return false;
+    }
+  }
+
+  Future<String?> _getRecipientId(String type, String value) async {
+    try {
+      String fieldName = type.toLowerCase();
+
+      QuerySnapshot query =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where(fieldName, isEqualTo: value)
+              .get();
+
+      if (query.docs.isNotEmpty) {
+        return query.docs.first.id;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting recipient ID: $e');
+      return null;
+    }
+  }
+
+  Future<void> _processTransaction() async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      bool isValid = await _validateTransaction();
+      if (!isValid) {
+        setState(() {
+          _isProcessing = false;
+        });
+        return;
+      }
+
+      double amount = double.parse(_amountController.text);
+      String? recipientId = await _getRecipientId(
+        _selectedRecipientType,
+        _recipientController.text,
+      );
+
+      if (recipientId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error finding recipient'),
+            backgroundColor: Colors.red[600],
+          ),
+        );
+        setState(() {
+          _isProcessing = false;
+        });
+        return;
+      }
+
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+
+      DocumentReference senderRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUserId);
+
+      batch.update(senderRef, {'balance': FieldValue.increment(-amount)});
+
+      DocumentReference recipientRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(recipientId);
+
+      batch.update(recipientRef, {'balance': FieldValue.increment(amount)});
+
+      DocumentReference transactionRef =
+          FirebaseFirestore.instance.collection('transactions').doc();
+
+      batch.set(transactionRef, {
+        'sender': _currentUserId,
+        'recipient': recipientId,
+        'amount': amount,
+        'method': _selectedPaymentMethod,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'completed',
+        'type': 'transfer',
+      });
+
+      DocumentReference senderHistoryRef =
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(_currentUserId)
+              .collection('transaction_history')
+              .doc();
+
+      batch.set(senderHistoryRef, {
+        'transactionId': transactionRef.id,
+        'partnerId': recipientId,
+        'partnerInfo': _recipientController.text,
+        'amount': -amount,
+        'method': _selectedPaymentMethod,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'sent',
+      });
+
+      DocumentReference recipientHistoryRef =
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(recipientId)
+              .collection('transaction_history')
+              .doc();
+
+      batch.set(recipientHistoryRef, {
+        'transactionId': transactionRef.id,
+        'partnerId': _currentUserId,
+        'partnerInfo': 'User',
+        'amount': amount,
+        'method': _selectedPaymentMethod,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'received',
+      });
+
+      await batch.commit();
+
+      setState(() {
+        _userBalance -= amount;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Money sent successfully!'),
+          backgroundColor: Colors.green[600],
+        ),
+      );
+
+      setState(() {
+        _step = 1;
+        _recipientController.clear();
+        _amountController.clear();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Transaction failed: ${e.toString()}'),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
   }
 
   void _confirmTransaction() {
@@ -52,22 +291,37 @@ class _SendPageState extends State<SendPage> {
                 color: Colors.blue[800],
               ),
             ),
-            content: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.8,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Flexible(
+                  child: _buildDetailRow(
                     'Recipient ($_selectedRecipientType)',
                     _recipientController.text,
                   ),
-                  _buildDetailRow('Amount', '\$${_amountController.text}'),
-                  _buildDetailRow('Method', _selectedPaymentMethod),
-                ],
-              ),
+                ),
+                Flexible(
+                  child: _buildDetailRow(
+                    'Amount',
+                    '\$${_amountController.text}',
+                  ),
+                ),
+                Flexible(
+                  child: _buildDetailRow('Method', _selectedPaymentMethod),
+                ),
+                const SizedBox(height: 5),
+                Flexible(
+                  child: Text(
+                    'Your balance after this transaction will be \$${(_userBalance - double.parse(_amountController.text)).toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             actions: [
@@ -79,13 +333,7 @@ class _SendPageState extends State<SendPage> {
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Money sent successfully!'),
-                      backgroundColor: Colors.green[600],
-                    ),
-                  );
-                  setState(() => _step = 1);
+                  _processTransaction();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue[800],
@@ -103,24 +351,27 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String title, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[800],
+          Expanded(
+            flex: 2,
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              softWrap: true,
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: Colors.blue[800],
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87),
+              softWrap: true,
+              overflow: TextOverflow.visible,
             ),
           ),
         ],
@@ -128,40 +379,77 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Send Money',
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
         ),
         backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         elevation: 0,
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Progress Indicator
-                _buildProgressIndicator(),
-                const SizedBox(height: 20),
-
-                // Dynamic Content Based on Step
-                if (_step == 1) ...[_buildRecipientStep()],
-
-                if (_step == 2) ...[_buildAmountStep()],
-
-                if (_step == 3) ...[_buildReviewStep()],
-              ],
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Center(
+              child: Text(
+                'Balance: \$${_userBalance.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[800],
+                ),
+              ),
             ),
           ),
-        ),
+        ],
+      ),
+      body: SafeArea(
+        child:
+            _isProcessing
+                ? _buildLoadingIndicator()
+                : SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildProgressIndicator(),
+                          const SizedBox(height: 20),
+
+                          if (_step == 1) ...[_buildRecipientStep()],
+
+                          if (_step == 2) ...[_buildAmountStep()],
+
+                          if (_step == 3) ...[_buildReviewStep()],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Colors.blue[800]),
+          const SizedBox(height: 16),
+          Text(
+            'Processing your transaction...',
+            style: TextStyle(
+              color: Colors.blue[800],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -237,6 +525,9 @@ class _SendPageState extends State<SendPage> {
             if (amount == null || amount <= 0) {
               return 'Please enter a valid amount';
             }
+            if (amount > _userBalance) {
+              return 'Insufficient balance';
+            }
             return null;
           },
         ),
@@ -296,6 +587,15 @@ class _SendPageState extends State<SendPage> {
               _buildDetailRow('Amount', '\$${_amountController.text}'),
               Divider(color: Colors.grey[300]),
               _buildDetailRow('Method', _selectedPaymentMethod),
+              Divider(color: Colors.grey[300]),
+              _buildDetailRow(
+                'Current Balance',
+                '\$${_userBalance.toStringAsFixed(2)}',
+              ),
+              _buildDetailRow(
+                'Balance After Transaction',
+                '\$${(_userBalance - double.parse(_amountController.text)).toStringAsFixed(2)}',
+              ),
             ],
           ),
         ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:VeloxPay/UI/views/dashboard/benefits.dart';
 import 'package:VeloxPay/UI/views/dashboard/card.dart';
 import 'package:VeloxPay/UI/views/dashboard/hub.dart';
@@ -97,6 +99,46 @@ class DashboardPageContent extends StatefulWidget {
 
 class _DashboardPageContentState extends State<DashboardPageContent> {
   bool _isVisible = true;
+  double _userBalance = 0.0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserBalance();
+  }
+
+  Future<void> _loadUserBalance() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final DocumentSnapshot userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+
+        if (mounted) {
+          setState(() {
+            _userBalance =
+                (userDoc.data() as Map<String, dynamic>)['balance'] ?? 0.0;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user balance: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,10 +163,15 @@ class _DashboardPageContentState extends State<DashboardPageContent> {
               ),
             ],
           ),
-          Text(
-            _isVisible ? '\$1.91' : '***',
-            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          ),
+          _isLoading
+              ? CircularProgressIndicator(color: Colors.blue[800])
+              : Text(
+                _isVisible ? '\$${_userBalance.toStringAsFixed(2)}' : '***',
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
           SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -136,7 +183,9 @@ class _DashboardPageContentState extends State<DashboardPageContent> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => ReceivePage()),
-                  );
+                  ).then(
+                    (_) => _loadUserBalance(),
+                  ); // Refresh balance when returning
                 },
               ),
               _actionButton(
@@ -145,7 +194,11 @@ class _DashboardPageContentState extends State<DashboardPageContent> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => SendPage()),
+                    MaterialPageRoute(
+                      builder:
+                          (context) =>
+                              SendPage(onTransactionComplete: _loadUserBalance),
+                    ),
                   );
                 },
               ),
@@ -156,7 +209,9 @@ class _DashboardPageContentState extends State<DashboardPageContent> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => ConvertPage()),
-                  );
+                  ).then(
+                    (_) => _loadUserBalance(),
+                  ); // Refresh balance when returning
                 },
               ),
               _actionButton(Icons.more_horiz, 'More'),

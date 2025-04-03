@@ -120,7 +120,6 @@ class _ReceivePageState extends State<ReceivePage> {
                         ),
                         const SizedBox(height: 20),
 
-                        // QR Code
                         Card(
                           elevation: 4,
                           shape: RoundedRectangleBorder(
@@ -168,7 +167,6 @@ class _ReceivePageState extends State<ReceivePage> {
 
                         const SizedBox(height: 30),
 
-                        // Email and Phone details
                         _buildDetailCard(
                           'Email',
                           _userEmail,

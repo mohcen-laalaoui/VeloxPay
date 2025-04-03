@@ -1,387 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:VeloxPay/repositories/send_repository.dart';
+import 'package:VeloxPay/viewmodels/send_viewmodel.dart';
 
-class SendPage extends StatefulWidget {
-  const SendPage({super.key});
+class SendPage extends StatelessWidget {
+  final VoidCallback? onTransactionComplete;
+
+  const SendPage({super.key, this.onTransactionComplete});
 
   @override
-  _SendPageState createState() => _SendPageState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => SendViewModel(SendRepository()),
+      child: _SendPageContent(onTransactionComplete: onTransactionComplete),
+    );
+  }
 }
 
-class _SendPageState extends State<SendPage> {
+class _SendPageContent extends StatefulWidget {
+  final VoidCallback? onTransactionComplete;
+
+  const _SendPageContent({super.key, this.onTransactionComplete});
+
+  @override
+  _SendPageContentState createState() => _SendPageContentState();
+}
+
+class _SendPageContentState extends State<_SendPageContent> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _recipientController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
-  String _selectedRecipientType = 'Phone';
-  String _selectedPaymentMethod = 'Bank Transfer';
-  int _step = 1;
-  bool _isProcessing = false;
-
-  final List<String> _recipientTypes = ['Phone', 'Email', 'ID'];
-  final List<String> _paymentMethods = [
-    'Bank Transfer',
-    'Mobile Wallet',
-    'Card Payment',
-  ];
-
-  late String _currentUserId;
-  double _userBalance = 10.0;
 
   @override
   void initState() {
     super.initState();
-    _getCurrentUser();
-    _loadUserBalance();
-  }
-
-  Future<void> _getCurrentUser() async {
-    final User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      setState(() {
-        _currentUserId = user.uid;
-      });
-    }
-  }
-
-  Future<void> _loadUserBalance() async {
-    try {
-      final User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final DocumentSnapshot userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
-
-        setState(() {
-          _userBalance =
-              (userDoc.data() as Map<String, dynamic>)['balance'] ?? 10.0;
-        });
+    final viewModel = Provider.of<SendViewModel>(context, listen: false);
+    viewModel.transactionResult.listen((success) {
+      if (success && widget.onTransactionComplete != null) {
+        widget.onTransactionComplete!();
       }
-    } catch (e) {
-      print('Error loading user balance: $e');
-    }
-  }
-
-  void _nextStep() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _step++;
-      });
-    }
-  }
-
-  void _previousStep() {
-    setState(() {
-      _step--;
     });
   }
-
-  Future<bool> _validateTransaction() async {
-    double amount = double.parse(_amountController.text);
-
-    if (amount > _userBalance) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Insufficient balance for this transaction'),
-          backgroundColor: Colors.red[600],
-        ),
-      );
-      return false;
-    }
-
-    bool recipientExists = await _checkRecipientExists(
-      _selectedRecipientType,
-      _recipientController.text,
-    );
-
-    if (!recipientExists) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Recipient not found with this $_selectedRecipientType',
-          ),
-          backgroundColor: Colors.red[600],
-        ),
-      );
-      return false;
-    }
-
-    return true;
-  }
-
-  Future<bool> _checkRecipientExists(String type, String value) async {
-    try {
-      String fieldName = type.toLowerCase();
-
-      QuerySnapshot query =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .where(fieldName, isEqualTo: value)
-              .get();
-
-      return query.docs.isNotEmpty;
-    } catch (e) {
-      print('Error checking recipient: $e');
-      return false;
-    }
-  }
-
-  Future<String?> _getRecipientId(String type, String value) async {
-    try {
-      String fieldName = type.toLowerCase();
-
-      QuerySnapshot query =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .where(fieldName, isEqualTo: value)
-              .get();
-
-      if (query.docs.isNotEmpty) {
-        return query.docs.first.id;
-      }
-      return null;
-    } catch (e) {
-      print('Error getting recipient ID: $e');
-      return null;
-    }
-  }
-
-  Future<void> _processTransaction() async {
-    setState(() {
-      _isProcessing = true;
-    });
-
-    try {
-      bool isValid = await _validateTransaction();
-      if (!isValid) {
-        setState(() {
-          _isProcessing = false;
-        });
-        return;
-      }
-
-      double amount = double.parse(_amountController.text);
-      String? recipientId = await _getRecipientId(
-        _selectedRecipientType,
-        _recipientController.text,
-      );
-
-      if (recipientId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error finding recipient'),
-            backgroundColor: Colors.red[600],
-          ),
-        );
-        setState(() {
-          _isProcessing = false;
-        });
-        return;
-      }
-
-      WriteBatch batch = FirebaseFirestore.instance.batch();
-
-      DocumentReference senderRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUserId);
-
-      batch.update(senderRef, {'balance': FieldValue.increment(-amount)});
-
-      DocumentReference recipientRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(recipientId);
-
-      batch.update(recipientRef, {'balance': FieldValue.increment(amount)});
-
-      DocumentReference transactionRef =
-          FirebaseFirestore.instance.collection('transactions').doc();
-
-      batch.set(transactionRef, {
-        'sender': _currentUserId,
-        'recipient': recipientId,
-        'amount': amount,
-        'method': _selectedPaymentMethod,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'completed',
-        'type': 'transfer',
-      });
-
-      DocumentReference senderHistoryRef =
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(_currentUserId)
-              .collection('transaction_history')
-              .doc();
-
-      batch.set(senderHistoryRef, {
-        'transactionId': transactionRef.id,
-        'partnerId': recipientId,
-        'partnerInfo': _recipientController.text,
-        'amount': -amount,
-        'method': _selectedPaymentMethod,
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'sent',
-      });
-
-      DocumentReference recipientHistoryRef =
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(recipientId)
-              .collection('transaction_history')
-              .doc();
-
-      batch.set(recipientHistoryRef, {
-        'transactionId': transactionRef.id,
-        'partnerId': _currentUserId,
-        'partnerInfo': 'User',
-        'amount': amount,
-        'method': _selectedPaymentMethod,
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'received',
-      });
-
-      await batch.commit();
-
-      setState(() {
-        _userBalance -= amount;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Money sent successfully!'),
-          backgroundColor: Colors.green[600],
-        ),
-      );
-
-      setState(() {
-        _step = 1;
-        _recipientController.clear();
-        _amountController.clear();
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Transaction failed: ${e.toString()}'),
-          backgroundColor: Colors.red[600],
-        ),
-      );
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
-
-  void _confirmTransaction() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            title: Text(
-              'Confirm Transaction',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.blue[800],
-              ),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Flexible(
-                  child: _buildDetailRow(
-                    'Recipient ($_selectedRecipientType)',
-                    _recipientController.text,
-                  ),
-                ),
-                Flexible(
-                  child: _buildDetailRow(
-                    'Amount',
-                    '\$${_amountController.text}',
-                  ),
-                ),
-                Flexible(
-                  child: _buildDetailRow('Method', _selectedPaymentMethod),
-                ),
-                const SizedBox(height: 5),
-                Flexible(
-                  child: Text(
-                    'Your balance after this transaction will be \$${(_userBalance - double.parse(_amountController.text)).toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _processTransaction();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[800],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  'Confirm',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Widget _buildDetailRow(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              softWrap: true,
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              style: const TextStyle(color: Colors.black87),
-              softWrap: true,
-              overflow: TextOverflow.visible,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = Provider.of<SendViewModel>(context);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -391,24 +54,11 @@ class _SendPageState extends State<SendPage> {
         ),
         backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: Center(
-              child: Text(
-                'Balance: \$${_userBalance.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[800],
-                ),
-              ),
-            ),
-          ),
-        ],
+        actions: [_buildBalanceDisplay(viewModel)],
       ),
       body: SafeArea(
         child:
-            _isProcessing
+            viewModel.isProcessing
                 ? _buildLoadingIndicator()
                 : SingleChildScrollView(
                   child: Padding(
@@ -418,19 +68,38 @@ class _SendPageState extends State<SendPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildProgressIndicator(),
+                          _buildProgressIndicator(viewModel),
                           const SizedBox(height: 20),
 
-                          if (_step == 1) ...[_buildRecipientStep()],
-
-                          if (_step == 2) ...[_buildAmountStep()],
-
-                          if (_step == 3) ...[_buildReviewStep()],
+                          if (viewModel.currentStep == 1) ...[
+                            _buildRecipientStep(viewModel),
+                          ],
+                          if (viewModel.currentStep == 2) ...[
+                            _buildAmountStep(viewModel),
+                          ],
+                          if (viewModel.currentStep == 3) ...[
+                            _buildReviewStep(viewModel),
+                          ],
                         ],
                       ),
                     ),
                   ),
                 ),
+      ),
+    );
+  }
+
+  Widget _buildBalanceDisplay(SendViewModel viewModel) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16.0),
+      child: Center(
+        child: Text(
+          'Balance: \$${viewModel.userBalance.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.blue[800],
+          ),
+        ),
       ),
     );
   }
@@ -454,7 +123,7 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  Widget _buildProgressIndicator() {
+  Widget _buildProgressIndicator(SendViewModel viewModel) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(3, (index) {
@@ -463,7 +132,10 @@ class _SendPageState extends State<SendPage> {
           height: 6,
           margin: const EdgeInsets.symmetric(horizontal: 5),
           decoration: BoxDecoration(
-            color: _step > index ? Colors.blue[800] : Colors.grey[300],
+            color:
+                viewModel.currentStep > index
+                    ? Colors.blue[800]
+                    : Colors.grey[300],
             borderRadius: BorderRadius.circular(3),
           ),
         );
@@ -471,26 +143,26 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  Widget _buildRecipientStep() {
+  Widget _buildRecipientStep(SendViewModel viewModel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DropdownButtonFormField<String>(
-          value: _selectedRecipientType,
+          value: viewModel.selectedRecipientType,
           decoration: _customInputDecoration('Send via'),
           items:
-              _recipientTypes
+              viewModel.recipientTypes
                   .map(
                     (type) => DropdownMenuItem(value: type, child: Text(type)),
                   )
                   .toList(),
-          onChanged: (value) => setState(() => _selectedRecipientType = value!),
+          onChanged: (value) => viewModel.updateRecipientType(value!),
         ),
         const SizedBox(height: 16),
         TextFormField(
-          controller: _recipientController,
+          controller: viewModel.recipientController,
           decoration: _customInputDecoration(
-            'Enter $_selectedRecipientType',
+            'Enter ${viewModel.selectedRecipientType}',
             prefixIcon: Icons.person_outline,
           ),
           validator:
@@ -498,19 +170,23 @@ class _SendPageState extends State<SendPage> {
                   value!.isEmpty ? 'Please enter recipient details' : null,
         ),
         const SizedBox(height: 24),
-        _buildNextButton(_nextStep),
+        _buildNextButton(() {
+          if (_formKey.currentState!.validate()) {
+            viewModel.nextStep();
+          }
+        }),
 
-        _buildQuickSendSection(),
+        _buildQuickSendSection(viewModel),
       ],
     );
   }
 
-  Widget _buildAmountStep() {
+  Widget _buildAmountStep(SendViewModel viewModel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextFormField(
-          controller: _amountController,
+          controller: viewModel.amountController,
           decoration: _customInputDecoration(
             'Amount',
             prefixIcon: Icons.attach_money_outlined,
@@ -525,7 +201,7 @@ class _SendPageState extends State<SendPage> {
             if (amount == null || amount <= 0) {
               return 'Please enter a valid amount';
             }
-            if (amount > _userBalance) {
+            if (amount > viewModel.userBalance) {
               return 'Insufficient balance';
             }
             return null;
@@ -533,30 +209,34 @@ class _SendPageState extends State<SendPage> {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: _selectedPaymentMethod,
+          value: viewModel.selectedPaymentMethod,
           decoration: _customInputDecoration('Payment Method'),
           items:
-              _paymentMethods
+              viewModel.paymentMethods
                   .map(
                     (method) =>
                         DropdownMenuItem(value: method, child: Text(method)),
                   )
                   .toList(),
-          onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
+          onChanged: (value) => viewModel.updatePaymentMethod(value!),
         ),
         const SizedBox(height: 24),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildBackButton(_previousStep),
-            _buildNextButton(_nextStep),
+            _buildBackButton(() => viewModel.previousStep()),
+            _buildNextButton(() {
+              if (_formKey.currentState!.validate()) {
+                viewModel.nextStep();
+              }
+            }),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildReviewStep() {
+  Widget _buildReviewStep(SendViewModel viewModel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -580,21 +260,21 @@ class _SendPageState extends State<SendPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildDetailRow(
-                'Recipient ($_selectedRecipientType)',
-                _recipientController.text,
+                'Recipient (${viewModel.selectedRecipientType})',
+                viewModel.recipientController.text,
               ),
               Divider(color: Colors.grey[300]),
-              _buildDetailRow('Amount', '\$${_amountController.text}'),
+              _buildDetailRow('Amount', '\$${viewModel.amountController.text}'),
               Divider(color: Colors.grey[300]),
-              _buildDetailRow('Method', _selectedPaymentMethod),
+              _buildDetailRow('Method', viewModel.selectedPaymentMethod),
               Divider(color: Colors.grey[300]),
               _buildDetailRow(
                 'Current Balance',
-                '\$${_userBalance.toStringAsFixed(2)}',
+                '\$${viewModel.userBalance.toStringAsFixed(2)}',
               ),
               _buildDetailRow(
                 'Balance After Transaction',
-                '\$${(_userBalance - double.parse(_amountController.text)).toStringAsFixed(2)}',
+                '\$${viewModel.getBalanceAfterTransaction().toStringAsFixed(2)}',
               ),
             ],
           ),
@@ -603,8 +283,8 @@ class _SendPageState extends State<SendPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildBackButton(_previousStep),
-            _buildConfirmButton(_confirmTransaction),
+            _buildBackButton(() => viewModel.previousStep()),
+            _buildConfirmButton(() => _confirmTransaction(viewModel)),
           ],
         ),
       ],
@@ -685,14 +365,7 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  Widget _buildQuickSendSection() {
-    final List<Map<String, dynamic>> recentContacts = [
-      {'name': 'Moncef Laalaoui ', 'avatar': 'ML', 'color': Colors.blue[200]},
-      {'name': 'Dhia Amani', 'avatar': 'DA', 'color': Colors.green[200]},
-      {'name': 'Chaker Ketfi', 'avatar': 'CH', 'color': Colors.orange[200]},
-      {'name': 'Bachir Bioud', 'avatar': 'BB', 'color': Colors.purple[200]},
-    ];
-
+  Widget _buildQuickSendSection(SendViewModel viewModel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -710,20 +383,20 @@ class _SendPageState extends State<SendPage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children:
-                recentContacts.map((contact) {
+                viewModel.recentContacts.map((contact) {
                   return GestureDetector(
                     onTap: () {
-                      _recipientController.text = contact['name'];
+                      viewModel.selectQuickContact(contact.name);
                     },
                     child: Container(
                       margin: const EdgeInsets.only(right: 10),
                       child: Column(
                         children: [
                           CircleAvatar(
-                            backgroundColor: contact['color'],
+                            backgroundColor: _getColorFromHex(contact.color),
                             radius: 30,
                             child: Text(
-                              contact['avatar'],
+                              contact.avatar,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -732,7 +405,7 @@ class _SendPageState extends State<SendPage> {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            contact['name'],
+                            contact.name,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[700],
@@ -749,10 +422,133 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _recipientController.dispose();
-    super.dispose();
+  Color _getColorFromHex(String hexColor) {
+    hexColor = hexColor.replaceAll('#', '');
+    return Color(int.parse('FF$hexColor', radix: 16));
+  }
+
+  void _confirmTransaction(SendViewModel viewModel) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            title: Text(
+              'Confirm Transaction',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue[800],
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Flexible(
+                  child: _buildDetailRow(
+                    'Recipient (${viewModel.selectedRecipientType})',
+                    viewModel.recipientController.text,
+                  ),
+                ),
+                Flexible(
+                  child: _buildDetailRow(
+                    'Amount',
+                    '\$${viewModel.amountController.text}',
+                  ),
+                ),
+                Flexible(
+                  child: _buildDetailRow(
+                    'Method',
+                    viewModel.selectedPaymentMethod,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Flexible(
+                  child: Text(
+                    'Your balance after this transaction will be \$${viewModel.getBalanceAfterTransaction().toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _processTransaction(viewModel);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[800],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Confirm',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _processTransaction(SendViewModel viewModel) async {
+    bool success = await viewModel.processTransaction();
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Money sent successfully!'),
+          backgroundColor: Colors.green[600],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Transaction failed. Please try again.'),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+    }
+  }
+
+  Widget _buildDetailRow(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              softWrap: true,
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87),
+              softWrap: true,
+              overflow: TextOverflow.visible,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

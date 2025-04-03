@@ -4,6 +4,8 @@ import 'package:VeloxPay/UI/views/home/home.dart';
 import 'package:VeloxPay/UI/views/auth/signin.dart';
 import 'package:VeloxPay/UI/views/dashboard/profile.dart';
 import 'package:VeloxPay/viewmodels/signin_viewmodel.dart';
+import 'package:VeloxPay/viewmodels/send_viewmodel.dart';
+import 'package:VeloxPay/repositories/send_repository.dart'; 
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -11,7 +13,14 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (context) => AuthViewModel())],
+      providers: [
+        ChangeNotifierProvider(create: (context) => AuthViewModel()),
+        ChangeNotifierProvider(
+          create:
+              (context) =>
+                  SendViewModel(SendRepository()), 
+        ),
+      ],
       child: MaterialApp(
         routes: {
           '/': (context) => HomePage(),

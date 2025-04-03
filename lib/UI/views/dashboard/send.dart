@@ -21,7 +21,7 @@ class SendPage extends StatelessWidget {
 class _SendPageContent extends StatefulWidget {
   final VoidCallback? onTransactionComplete;
 
-  const _SendPageContent({super.key, this.onTransactionComplete});
+  const _SendPageContent({this.onTransactionComplete});
 
   @override
   _SendPageContentState createState() => _SendPageContentState();

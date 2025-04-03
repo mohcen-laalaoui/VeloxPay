@@ -6,24 +6,33 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<User?> signUp(String email, String password, UserModel user) async {
-    try {
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(email: email, password: password);
+  Future<UserCredential> signUp(
+    String email,
+    String password,
+    UserModel user,
+  ) async {
+    UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
 
-      User? firebaseUser = userCredential.user;
-      if (firebaseUser == null) throw Exception("User creation failed");
+    await _firestore.collection('users').doc(userCredential.user!.uid).set({
+      'fullName': user.fullName,
+      'email': user.email,
+      'phoneNumber': user.phoneNumber,
+      'useBiometric': user.useBiometric,
+      'linkBankAccount': user.linkBankAccount,
+      'accountNumber': user.accountNumber,
+      'routingNumber': user.routingNumber,
+    });
 
-      await firebaseUser.updateDisplayName(user.fullName);
+    return userCredential;
+  }
 
-      Map<String, dynamic> userData = user.toJson();
-      userData['createdAt'] = FieldValue.serverTimestamp();
-
-      await _firestore.collection('users').doc(firebaseUser.uid).set(userData);
-
-      return firebaseUser;
-    } catch (e) {
-      rethrow;
-    }
+  Future<void> createUserBalance(String uid) async {
+    await _firestore.collection('users').doc(uid).update({
+      'balance': 10.0, 
+    });
   }
 }
+

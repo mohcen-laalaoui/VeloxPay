@@ -108,14 +108,17 @@ class SignUpViewModel extends ChangeNotifier {
         accountNumber:
             linkBankAccount ? accountNumberController.text.trim() : null,
         routingNumber:
-            linkBankAccount ? routingNumberController.text.trim() : null, uid: '',
+            linkBankAccount ? routingNumberController.text.trim() : null,
+        uid: '',
       );
 
-      await _authService.signUp(
+      UserCredential userCredential = await _authService.signUp(
         emailController.text.trim(),
         passwordController.text,
         user,
       );
+
+      await _authService.createUserBalance(userCredential.user!.uid);
 
       return {'success': true, 'message': 'Account created successfully!'};
     } on FirebaseAuthException catch (e) {

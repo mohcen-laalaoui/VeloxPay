@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:VeloxPay/data/models/send_model.dart';
 import 'package:VeloxPay/repositories/send_repository.dart';
+import 'package:VeloxPay/core/services/anomaly_detection_service.dart';
 
 class SendViewModel extends ChangeNotifier {
   final SendRepository _repository;
+  final AnomalyDetectionService _anomalyService;
 
   final TextEditingController recipientController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
@@ -25,12 +27,18 @@ class SendViewModel extends ChangeNotifier {
     'Card Payment',
   ];
 
-  SendViewModel(this._repository) {
+  SendViewModel(this._repository, {AnomalyDetectionService? anomalyService})
+    : _anomalyService = anomalyService ?? AnomalyDetectionService() {
     _init();
   }
 
   final _transactionResultController = StreamController<bool>.broadcast();
   Stream<bool> get transactionResult => _transactionResultController.stream;
+
+  final _anomalyDetectedController =
+      StreamController<AnomalyResult>.broadcast();
+  Stream<AnomalyResult> get anomalyDetected =>
+      _anomalyDetectedController.stream;
 
   Future<void> _init() async {
     await _loadCurrentUser();
@@ -97,7 +105,7 @@ class SendViewModel extends ChangeNotifier {
     return recipientExists;
   }
 
- Future<bool> processTransaction() async {
+  Future<bool> processTransaction({bool bypassAnomalyCheck = false}) async {
     isProcessing = true;
     notifyListeners();
 
@@ -120,11 +128,31 @@ class SendViewModel extends ChangeNotifier {
         return false;
       }
 
+      final amount = double.parse(amountController.text);
+
+      // Check for anomalies if not bypassed
+      if (!bypassAnomalyCheck && currentUserId != null) {
+        final anomalyResult = await _anomalyService.checkTransaction(
+          userId: currentUserId!,
+          recipientId: recipientId,
+          amount: amount,
+          paymentMethod: selectedPaymentMethod,
+          recipientType: selectedRecipientType,
+        );
+
+        if (anomalyResult.isAnomaly) {
+          isProcessing = false;
+          notifyListeners();
+          _anomalyDetectedController.add(anomalyResult);
+          return false;
+        }
+      }
+
       final transaction = SendTransactionModel(
         recipientId: recipientId,
         recipientInfo: recipientController.text,
         recipientType: selectedRecipientType,
-        amount: double.parse(amountController.text),
+        amount: amount,
         paymentMethod: selectedPaymentMethod,
       );
 
@@ -135,9 +163,7 @@ class SendViewModel extends ChangeNotifier {
 
       if (success) {
         userBalance -= transaction.amount;
-
         await _loadUserBalance();
-
         resetForm();
       }
 
@@ -166,6 +192,7 @@ class SendViewModel extends ChangeNotifier {
     recipientController.dispose();
     amountController.dispose();
     _transactionResultController.close();
+    _anomalyDetectedController.close();
     super.dispose();
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:VeloxPay/repositories/send_repository.dart';
 import 'package:VeloxPay/viewmodels/send_viewmodel.dart';
+import 'package:VeloxPay/core/services/anomaly_detection_service.dart';
 
 class SendPage extends StatelessWidget {
   final VoidCallback? onTransactionComplete;
@@ -12,7 +13,11 @@ class SendPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => SendViewModel(SendRepository()),
+      create:
+          (_) => SendViewModel(
+            SendRepository(),
+            anomalyService: AnomalyDetectionService(),
+          ),
       child: _SendPageContent(onTransactionComplete: onTransactionComplete),
     );
   }
@@ -34,10 +39,17 @@ class _SendPageContentState extends State<_SendPageContent> {
   void initState() {
     super.initState();
     final viewModel = Provider.of<SendViewModel>(context, listen: false);
+
+    // Listen for transaction results
     viewModel.transactionResult.listen((success) {
       if (success && widget.onTransactionComplete != null) {
         widget.onTransactionComplete!();
       }
+    });
+
+    // Listen for anomaly detection results
+    viewModel.anomalyDetected.listen((anomalyResult) {
+      _showAnomalyAlert(viewModel, anomalyResult);
     });
   }
 
@@ -504,8 +516,105 @@ class _SendPageContentState extends State<_SendPageContent> {
     );
   }
 
-  Future<void> _processTransaction(SendViewModel viewModel) async {
-    bool success = await viewModel.processTransaction();
+  void _showAnomalyAlert(SendViewModel viewModel, AnomalyResult anomalyResult) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange[700],
+                  size: 28,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Potential Risk Detected',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red[700],
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Our security system has flagged this transaction:',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Risk Score: ${(anomalyResult.riskScore * 100).toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Reason: ${anomalyResult.reason}',
+                  style: TextStyle(color: Colors.grey[800]),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Would you like to proceed with this transaction anyway?',
+                  style: const TextStyle(fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text(
+                        'Transaction cancelled due to security concerns.',
+                      ),
+                      backgroundColor: Colors.orange[700],
+                    ),
+                  );
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+                child: const Text('Cancel Transaction'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Process transaction with bypass flag
+                  _processTransaction(viewModel, bypassAnomalyCheck: true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Proceed Anyway',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _processTransaction(
+    SendViewModel viewModel, {
+    bool bypassAnomalyCheck = false,
+  }) async {
+    bool success = await viewModel.processTransaction(
+      bypassAnomalyCheck: bypassAnomalyCheck,
+    );
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
